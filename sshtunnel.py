@@ -1609,6 +1609,7 @@ class SSHTunnelForwarder(object):
             return self
         except KeyboardInterrupt:
             self.__exit__()
+            raise
 
     def __exit__(self, *args):
         self.stop(force=True)

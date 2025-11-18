@@ -257,7 +257,7 @@ Logger naming convention: `'sshtunnel.SSHTunnelForwarder'`
 
 2. **Authentication Methods**
    - Password authentication
-   - Private key files (RSA/DSS/ECDSA)
+   - Private key files (RSA/ECDSA/Ed25519)
    - SSH agent support (can be disabled)
    - Password-protected private keys
 

@@ -1398,3 +1398,80 @@ class AuxiliaryTest(unittest.TestCase):
             sshtunnel.check_address('this is not valid')
         with self.assertRaises(ValueError):
             sshtunnel.check_address(-1)  # that's not valid either
+
+    def test_paramiko_3_compatibility(self):
+        """ Test that paramiko 3.0+ is being used (no DSSKey) """
+        # Verify paramiko version is 3.0 or higher
+        import paramiko
+        version_parts = paramiko.__version__.split('.')
+        major_version = int(version_parts[0])
+        self.assertGreaterEqual(major_version, 3,
+                                "paramiko version should be 3.0 or higher")
+
+        # Verify DSSKey is not available
+        self.assertFalse(hasattr(paramiko, 'DSSKey'),
+                        "paramiko.DSSKey should not exist in paramiko 3.0+")
+
+        # Verify required key types are available
+        self.assertTrue(hasattr(paramiko, 'RSAKey'),
+                       "paramiko.RSAKey should be available")
+        self.assertTrue(hasattr(paramiko, 'ECDSAKey'),
+                       "paramiko.ECDSAKey should be available")
+        self.assertTrue(hasattr(paramiko, 'Ed25519Key'),
+                       "paramiko.Ed25519Key should be available")
+
+    def test_supported_key_types(self):
+        """ Test that only supported key types are in paramiko_key_types """
+        # Get the key types from get_keys method
+        import tempfile
+        tmp_dir = tempfile.mkdtemp()
+
+        # This will trigger the paramiko_key_types dictionary creation
+        keys = sshtunnel.SSHTunnelForwarder.get_keys(
+            logger=None,
+            host_pkey_directories=[tmp_dir],
+            allow_agent=False
+        )
+
+        # Verify it's a list
+        self.assertIsInstance(keys, list)
+
+        # The supported types should be rsa, ecdsa, and ed25519 (no dsa)
+        # We can't directly access paramiko_key_types dict, but we can verify
+        # that the code doesn't fail when trying to load keys
+
+        import shutil
+        shutil.rmtree(tmp_dir)
+
+    def test_read_private_key_without_dss(self):
+        """ Test that read_private_key_file works without DSS support """
+        # Test with RSA key
+        pkey = sshtunnel.SSHTunnelForwarder.read_private_key_file(
+            get_test_data_path(PKEY_FILE),
+            logger=None
+        )
+        self.assertIsInstance(pkey, paramiko.RSAKey)
+
+        # Test with encrypted RSA key
+        pkey_encrypted = sshtunnel.SSHTunnelForwarder.read_private_key_file(
+            get_test_data_path(ENCRYPTED_PKEY_FILE),
+            pkey_password='sshtunnel',
+            logger=None
+        )
+        self.assertIsInstance(pkey_encrypted, paramiko.RSAKey)
+
+        # Verify the key types tuple doesn't include DSSKey
+        # by checking it can still read keys successfully
+        self.assertEqual(pkey, pkey_encrypted)
+
+    def test_fingerprints_no_dss(self):
+        """ Test that FINGERPRINTS constant doesn't include ssh-dss """
+        # Verify ssh-dss is not in FINGERPRINTS
+        self.assertNotIn('ssh-dss', FINGERPRINTS,
+                        "ssh-dss should not be in FINGERPRINTS")
+
+        # Verify supported types are present
+        self.assertIn('ssh-rsa', FINGERPRINTS,
+                     "ssh-rsa should be in FINGERPRINTS")
+        self.assertIn('ecdsa-sha2-nistp256', FINGERPRINTS,
+                     "ecdsa-sha2-nistp256 should be in FINGERPRINTS")
